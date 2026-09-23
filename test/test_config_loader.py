@@ -274,6 +274,28 @@ def test_sandbox_allow_unsandboxed_exec_loads_from_config() -> None:
     assert enabled.agent.sandbox_allow_unsandboxed_exec is True
 
 
+def test_clarify_before_starting_loads_from_config() -> None:
+    """The key has to be READ from config.json, not merely declared on the section.
+
+    ``AgentConfig`` enumerates every field explicitly at its construction site, so
+    a new dataclass field is serialized on save (the gateway writes it out) while
+    still loading as its default forever. That failure is invisible to any test
+    that builds or patches a config OBJECT -- it only shows up by loading one from
+    disk, which is what this does.
+    """
+    assert KiroCrewConfig().agent.clarify_before_starting is False
+    assert _load_from_dict({}).agent.clarify_before_starting is False
+    enabled = _load_from_dict({"agent": {"clarify_before_starting": True}})
+    assert enabled.agent.clarify_before_starting is True
+    # Coerced, not trusted: a non-boolean must not enable an ask-the-user posture
+    # by truthiness, because config.json is operator-editable and a stray string
+    # would silently change how every dashboard turn behaves.
+    assert (
+        _load_from_dict({"agent": {"clarify_before_starting": "yes"}}).agent.clarify_before_starting
+        is False
+    )
+
+
 def test_ssh_auth_sock_forward_is_not_an_agent_config_field() -> None:
     """The SSH_AUTH_SOCK forward enable is NOT read from config.json.
 

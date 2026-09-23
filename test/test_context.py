@@ -285,6 +285,67 @@ class TestContextBuilder:
             assert "ask_question" not in other, f"{sk!r} must NOT get the question nudge"
             assert "suggest_followup" not in other, f"{sk!r} must NOT get the follow-up nudge"
 
+    def test_clarify_before_starting_inverts_the_question_posture(self, tmp_path, monkeypatch):
+        """``agent.clarify_before_starting`` swaps the posture, not the contract.
+
+        The shipped default tells the agent to infer and stay silent, which is the
+        wrong trade for someone who would rather have an under-specified request
+        scoped before any work is aimed. Turning the key on must replace the
+        restraint framing with an ask-up-front one and STILL carry the
+        non-blocking contract, because the tool's mechanics do not change with the
+        preference: the card never blocks, so the agent still has to end its turn.
+        """
+        from kiro_crew.config import live
+        from kiro_crew.config.loader import KiroCrewConfig
+
+        builder = ContextBuilder(
+            memory=MemoryStore(workspace=tmp_path / "ws"),
+            skills=SkillsLoader(skills_path=tmp_path / "skills", install_builtins=False),
+            lessons=LessonStore(base_dir=tmp_path),
+        )
+        # Off unless asked for: an install that never sets the key keeps the
+        # shipped wording, so this can change nobody's behaviour by upgrading.
+        assert KiroCrewConfig().agent.clarify_before_starting is False
+
+        _cfg = KiroCrewConfig()
+        _cfg.agent.clarify_before_starting = True
+        monkeypatch.setattr(live, "snapshot", lambda: _cfg)
+        on, _ = builder.build_message(
+            "make it faster",
+            is_new_session=False,
+            interactive=True,
+            session_key="dashboard:chat-1",
+        )
+        assert "CLARIFY BEFORE STARTING" in on
+        # Scope the check to the question block's own wording. "DEFAULT TO SILENCE"
+        # is deliberately NOT asserted absent: the sibling suggest_followup nudge
+        # carries that phrase too, and this key has no business touching it.
+        assert "human-only decision" not in on, "the question block's restraint framing must go"
+        # One card, up front. A posture that drips questions once work is underway
+        # is worse than one that never asks, because the work is already misaimed.
+        assert "ONE card" in on
+        assert "BEFORE beginning the work" in on
+        # Mechanics are not a preference: the card still does not block.
+        assert "NON-BLOCKING" in on
+        assert "END YOUR TURN" in on
+        # The licence stays bounded -- not permission to ask what it could resolve.
+        assert "read, run, search or infer" in on
+        # Blast radius: the follow-up nudge is a different decision and keeps its
+        # own restraint, so enabling this must not quietly loosen that one too.
+        assert "suggest_followup" in on
+        assert "only after a genuinely large finished task" in on
+
+        # No card surface, no nudge: the preference cannot conjure one where the
+        # card has nowhere to render, so a channel session is unaffected.
+        slack, _ = builder.build_message(
+            "make it faster",
+            is_new_session=False,
+            interactive=True,
+            session_key="slack:C123",
+        )
+        assert "CLARIFY BEFORE STARTING" not in slack
+        assert "ask_question" not in slack
+
     def test_interactive_guidance_precedes_current_request(self, tmp_path):
         """The request, not generic UI guidance, owns the prompt's recency edge.
 

@@ -2549,6 +2549,7 @@ def _build_agent_config(agent_data: dict) -> AgentConfig:
     return AgentConfig(
         approval_mode=agent_data.get("approval_mode", "auto"),
         streaming=agent_data.get("streaming", True),
+        clarify_before_starting=_safe_bool(agent_data.get("clarify_before_starting", False), False),
         model=agent_data.get("model", DEFAULT_MODEL),
         role_models=coerce_role_models(agent_data.get("role_models")),
         role_efforts=coerce_role_efforts(agent_data.get("role_efforts")),

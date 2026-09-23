@@ -5080,16 +5080,42 @@ class ContextBuilder:
             # what blocks is the DECISION, not the tool call. [OPTIONS:] remains
             # the cheaper choice mechanism on every interactive surface.
             if has_dashboard_surface(session_key or "") and _agent_includes_crew_context(agent):
-                _interactive_guidance.append(
-                    "\n\n(The ask_question tool posts a NON-BLOCKING dashboard card. "
-                    "DEFAULT TO SILENCE: use it only when work cannot continue without a "
-                    "human-only decision (permission, irreversible/costly action, or an "
-                    "uninferable preference). Decide anything you can read, run, search "
-                    "or infer yourself; never ask to reconfirm an authorized plan or "
-                    "merely because a choice exists. END YOUR TURN after calling; the "
-                    "answer arrives as the next user message, not the tool result. "
-                    "When ending anyway, [OPTIONS:] is cheaper.)"
-                )
+                # The posture is configurable. `agent.clarify_before_starting`
+                # inverts the default for a genuinely ambiguous request, without
+                # licensing questions the agent could answer itself. Read from the
+                # live snapshot rather than `KiroCrewConfig.load()`: this is
+                # per-turn context assembly, so it lands directly on
+                # time-to-first-token, and the snapshot is a plain attribute read
+                # of the config the rest of the gateway has already adopted. It is
+                # None before the watcher starts, which falls through to the
+                # shipped default-to-silence wording.
+                _live_agent = getattr(live.snapshot(), "agent", None)
+                _clarify_first = bool(getattr(_live_agent, "clarify_before_starting", False))
+                if _clarify_first:
+                    _interactive_guidance.append(
+                        "\n\n(The ask_question tool posts a NON-BLOCKING dashboard card. "
+                        "CLARIFY BEFORE STARTING: when the request is genuinely ambiguous "
+                        "between materially different outcomes, or needs a decision only "
+                        "the user can make, post ONE card carrying EVERY open question "
+                        "BEFORE beginning the work -- not once it is underway, and never a "
+                        "second card. Investigate first: still decide anything you can "
+                        "read, run, search or infer, and never re-confirm a plan you were "
+                        "already given -- a choice merely existing is not a reason to ask. "
+                        "When nothing genuinely needs the user, ask nothing and proceed. "
+                        "END YOUR TURN after calling; the answer arrives as the next user "
+                        "message, not the tool result.)"
+                    )
+                else:
+                    _interactive_guidance.append(
+                        "\n\n(The ask_question tool posts a NON-BLOCKING dashboard card. "
+                        "DEFAULT TO SILENCE: use it only when work cannot continue without a "
+                        "human-only decision (permission, irreversible/costly action, or an "
+                        "uninferable preference). Decide anything you can read, run, search "
+                        "or infer yourself; never ask to reconfirm an authorized plan or "
+                        "merely because a choice exists. END YOUR TURN after calling; the "
+                        "answer arrives as the next user message, not the tool result. "
+                        "When ending anyway, [OPTIONS:] is cheaper.)"
+                    )
                 # A follow-up card is distinct from both: it offers concrete NEXT
                 # tasks after work is done, optionally handing one to a worktree.
                 _interactive_guidance.append(

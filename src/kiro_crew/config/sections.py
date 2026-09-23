@@ -844,6 +844,21 @@ class AgentConfig:
         default=True,
         metadata=_meta("Streaming", "Enable streaming responses."),
     )
+    clarify_before_starting: bool = field(
+        default=False,
+        metadata=_meta(
+            "Clarify before starting",
+            "Ask before inferring when a request is under-specified. Off by default: "
+            "the agent resolves what it can and raises an ask_question card only when "
+            "the work cannot continue without a human-only decision. When on, a "
+            "request that is genuinely ambiguous between materially different "
+            "outcomes gets ONE card carrying every open question BEFORE the work "
+            "begins, instead of the agent picking a reading and proceeding. This does "
+            "not license asking what the agent can read, run, search or infer, and it "
+            "never re-confirms an already-authorized plan. Dashboard sessions only, "
+            "since the card needs a dashboard surface to render into.",
+        ),
+    )
     model: str = field(
         default=DEFAULT_MODEL,
         metadata=_meta("Model", "LLM model identifier. 'auto' resolves from agent config."),
